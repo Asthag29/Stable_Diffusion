@@ -78,3 +78,47 @@ class Vae_AttentionBlock(nn.Module):
 
         return x
         
+class CrossAttention(nn.Module):
+    def __init__(self, n_heads, d_embd , d_cross , in_proj_bias = True , out_proj_bias= True): 
+        super().__init__()
+        self.q_proj = nn.Linear(d_embd , d_embd, bias = in_proj_bias)
+        self.k_proj = nn.Linear(d_cross , d_embd, bias = in_proj_bias)
+        self.v_proj = nn.Linear(d_cross , d_embd, bias = in_proj_bias)
+
+        self.out_proj = nn.Linear(d_embd, d_embd , bias = out_proj_bias)
+        self.n_heads = n_heads
+        self.d_head = d_embd//n_heads
+
+    def forward(self,x,y):
+        # x --> latent --> batch_size , seq_len_q, dim_q
+        # y --> context --> batch_size , sew_len_kv , dim_kv --> batchsize , 77, 768
+        input_shape = x .shape
+        batch_size , sequence_lenth , d_embd = input_shape
+
+        intermin_shape =(batch_size , -1 ,self.n_heads , self.d_head)
+
+        q = self.q_proj(x)
+        k = self.k_proj(x)
+        v = self.v_proj(x)
+
+        q = q.view(intermin_shape).transpose(1,2)
+        k = k.view(intermin_shape).transpose(1,2)
+        v = v.view(intermin_shape).transpose(1,2)
+
+        wei = q @ k.t(-1,-2)
+
+        wei /= math.sqrt(self.d_head)
+
+        wei = F.softmax(wei, dim=1)
+
+        output = wei * v
+
+        output= output.t(1,2).contiguous()      #what is this new function
+
+        output = output.view(input_shape)
+        output = self.out_proj(output)
+   
+        return output 
+
+        
+
