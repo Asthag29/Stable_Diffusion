@@ -225,11 +225,10 @@ class UNet_output_layer(nn.Module):
 
         return x
 
-
-
 class Diffusion(nn.Module):
 
     def __init__(self):
+        super().__init__()
         self.time_embedding = TimeEmbedding(320)
         self.unet = UNet()
         self.final = UNet_output_layer(320,4)
