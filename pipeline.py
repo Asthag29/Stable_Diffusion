@@ -12,12 +12,13 @@ Latent_Height = Height // 8
 
 # cfg_scale = 7.5 (difference between conditioned and unconditioned)
 # uncon_prompt = without any conditontion
-# each time step indicate the noise level 
+# each time step indicate the noise level so 
 
 def generate(prompt : str , uncon_prompt: str , inp_image = None , 
              strength = 0.8 , do_cfg= True , sampler_name = "ddpm" , 
              n_inferenc_steps = 50 , model={}, seed = None,
              device = None , idle_device = None , tokenizer = None,
+             cfg_scale = 7.5
              ):
     with torch.no_grad():
 
@@ -93,6 +94,65 @@ def generate(prompt : str , uncon_prompt: str , inp_image = None ,
 
         diffusion = model["diffusion"]
         diffusion.to(device)
+
+        timesteps = tqdm(sampler.timesteps)
+         
+        for i , timestep in enumerate(timesteps):
+             time_embedding = get_time_embedding(timestep).to(device)
+
+             model_input = latents
+
+             if do_cfg:
+                  model_input = model_input.repeat(2,1,1,1)
+                
+
+             model_output = diffusion(model_input, context, time_embedding)
+
+
+            #  why do we predict noise instead of the denoised image itself
+
+             if do_cfg:
+                  output_cond , output_uncond = model_output.chunk(2)
+                  model_output = cfg_scale * (output_cond - output_uncond) + output_uncond
+
+             latents = sampler.step(timestep, latents, model_output)
+
+             to_idle(diffusion)
+
+             decoder = model["decoder"]
+             decoder.to(decoder)
+
+             images = decoder(latents)
+             images = rescale(images, (-1,-1),(0,255),clamp=True)
+             images = images.permute(0,2,3,1)
+
+             images = images.to("cpu", torch.uint8).numpy
+
+def rescale(x , old_range , new_range , clamp = False):
+     old_min , old_max = old_range
+     new_min , new_max = new_range
+
+     x -= old_min
+     x *= (new_max-new_min) / (old_max- old_min)
+     x += new_min
+     x += new_min
+
+     if clamp:
+          x = x.clamp(new_min, new_max)
+     return x
+
+
+def get_time_embedding(timestep):
+     
+     freqs = torch.pow(10000, -torch.arange(start=0, end=160, dtype=torch.float32) / 160)
+     x = torch.tensor([timestep], dtype=torch.float32)[:None]* freqs[None]
+     return torch.cat([torch.cos(x), torch.sin(x)], dim=-1)
+
+        
+
+
+                  
+
 
 
 
