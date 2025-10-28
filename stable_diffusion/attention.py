@@ -45,6 +45,7 @@ class SelfAttention(nn.Module):
 
         return output
 
+# Cross Attention
 class CrossAttention(nn.Module):
 
     def __init__(self, n_heads, d_embd , d_cross , in_proj_bias = True , out_proj_bias= True): 

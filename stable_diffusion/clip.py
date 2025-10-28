@@ -4,7 +4,7 @@ from torch.nn import functional as F
 from attention import SelfAttention
 
 
-class ClipEmbedding(nn.Module):
+class ClipEmbedding(nn.Module):     #inout embedding
      
      # n_vocab : vocabulary size
      # n_embd : embedding dimension
@@ -13,7 +13,7 @@ class ClipEmbedding(nn.Module):
 
         super().__init__()
 
-        # converting token space to embedding dimension(cause we are working in the embedding space)
+        # converting token space to embedding dimension where each token has it's unique number which is then converted into n_embd(cause we are working in the embedding space)
         self.token_embedding = nn.Embedding(n_vocab, n_embd)
         # positional embedding(all the values are initialized to zero), nn.Parameter makes it learnable(makes the gradient flow possible)
         self.position_embedding = nn.Parameter(torch.zeros(n_token,n_embd)) 
