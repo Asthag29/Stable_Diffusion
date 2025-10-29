@@ -117,6 +117,4 @@ class UNet_ResidualBlock(nn.Module):
 
         return merged + self.residual_layer(residue)
 
-# Verdict: Functionally equivalent to the prompt's UNET blocks — same shapes/ops; differences only in naming and minor defaults.
-
 

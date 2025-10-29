@@ -8,19 +8,19 @@ import math
 #self attention
 class SelfAttention(nn.Module):
 
-    def __init__( self , n_heads:int, d_embd: int, in_proj_bias=True , out_proj=True):
+    def __init__( self , n_heads:int, d_embd: int, in_proj_bias=True , out_proj_bias=True):
 
         super().__init__()
 
         self.in_proj = nn.Linear( d_embd, 3 * d_embd , bias= in_proj_bias)  
-        self.out_proj = nn.Linear(d_embd, d_embd, bias=out_proj)
+        self.out_proj = nn.Linear(d_embd, d_embd, bias=out_proj_bias)
         self.n_heads = n_heads
         self.d_head = d_embd // n_heads
 
-    def forward(self, x:torch.Tensor , casual_mask= True):
+    def forward(self, x:torch.Tensor , casual_mask= False):
 
         input_shape = x.shape   # (batch_size , sequence_len/height*width , d_embd/channels)
-        batch_size , sequence_len , self.d_embd = input_shape   
+        batch_size , sequence_len , d_embd = input_shape   
 
         intermediate_shape = (batch_size, sequence_len, self.n_heads , self.d_head)
 
@@ -30,12 +30,13 @@ class SelfAttention(nn.Module):
         k = k.view(intermediate_shape).transpose(1,2)   # (batch_size , sequence_len , d_embd) -> (batch_size , sequence_len , n_heads , d_head) -> (batch_size , n_heads , sequence_len , d_head)
         v = v.view(intermediate_shape).transpose(1,2)   # (batch_size , sequence_len , d_embd) -> (batch_size , sequence_len , n_heads , d_head) -> (batch_size , n_heads , sequence_len , d_head)
 
-        wei = q @ k.T   #wei(batch_size , n_heads , sequence_len , sequence_len) = (batch_size , n_heads , sequence_len , d_head) @ (batch_size , n_heads , d_head , sequence_len) 
+        wei = q @ k.transpose(-1, -2)   #wei(batch_size , n_heads , sequence_len , sequence_len) = (batch_size , n_heads , sequence_len , d_head) @ (batch_size , n_heads , d_head , sequence_len) 
+        wei = wei/math.sqrt(self.d_head)
+
         if casual_mask:     # weather we want masked attention or not
-            mask = torch.ones_like(wei , dtype=torch.bool).tril(1)
+            mask = torch.ones_like(wei , dtype=torch.bool).triu(1)
             wei.masked_fill_(mask, -torch.inf)
 
-        wei = wei/math.sqrt(self.d_head)
         wei = F.softmax(wei, dim = -1)
 
         output = wei @ v        #output  -> (batch_size , n_heads , sequence_len , d_head)
@@ -79,12 +80,12 @@ class CrossAttention(nn.Module):
         k = k.view(intermin_shape).transpose(1,2)   #(batch_size , seq_len_kv , d_embd) -> (batch_size , seq_len_kv , n_heads , d_head) -> (batch_size , n_heads , seq_len_kv , d_head)
         v = v.view(intermin_shape).transpose(1,2)   #(batch_size , seq_len_kv , d_embd) -> (batch_size , seq_len_kv , n_heads , d_head) -> (batch_size , n_heads , seq_len_kv , d_head)
 
-        wei = q @ k.t(-1,-2)    #wei -> (batch_size , n_heads , seq_len_q , seq_len_kv) = (batch_size , n_heads , seq_len_q , d_head) @ (batch_size , n_heads , d_head , seq_len_kv)
+        wei = q @ k.transpose(-1,-2)    #wei -> (batch_size , n_heads , seq_len_q , seq_len_kv) = (batch_size , n_heads , seq_len_q , d_head) @ (batch_size , n_heads , d_head , seq_len_kv)
         wei /= math.sqrt(self.d_head)
-        wei = F.softmax(wei, dim=1)
+        wei = F.softmax(wei, dim=-1)
 
-        output = wei * v    # output -> (batch_size , n_heads , seq_len_q , d_head)
-        output= output.t(1,2).contiguous()      #output(batch_size , seq_len_q , n_heads , d_head)
+        output = wei @ v    # output -> (batch_size , n_heads , seq_len_q , d_head)
+        output= output.transpose(1,2).contiguous()      #output(batch_size , seq_len_q , n_heads , d_head)
         output = output.view(input_shape)       #(batch_size , seq_len_q , d_embd)  , d_embd = n_heads * d_head
         output = self.out_proj(output)          # (batch_size , seq_len_q , d_embd)
 

@@ -48,8 +48,10 @@ class VAE_Encoder(nn.Sequential):
                 x = F.pad(x , (0,1,0,1)) 
             x = module(x)
 
-        log_variance = torch.clamp(log_variance , -30 , 20)  #clamping all the values between -30 and 20 for stability(all values less than -30 are set to -30 and all values greater than 20 are set to 20)
+            
         mean , log_variance = torch.chunk(x , 2 , dim=1)    #(batch_size , 8 , height/8 , width/8) --> 2*  (batch_size , 4 , height/8 , width/8)
+
+        log_variance = torch.clamp(log_variance , -30 , 20)  #clamping all the values between -30 and 20 for stability(all values less than -30 are set to -30 and all values greater than 20 are set to 20)
         variance = log_variance.exp()
         stdev= variance.sqrt()
         

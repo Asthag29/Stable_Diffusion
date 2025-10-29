@@ -2,6 +2,10 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from ddpm import DDPMSampler
+import model_loader
+from PIL import Image
+from transformers import CLIPTokenizer
+import torch
 
 
 Width = 512     #final image width(input)
@@ -70,18 +74,18 @@ def generate(
 
             # concatenating both the context vectors
             context = torch.cat([cond_context, uncon_context])  #(batch_size*2 , seq_len/context length , dim/channels/embedding )
-
+            # print(f"context_max: {context.max().item():.3f}, context_min: {context.min().item():.3f}")
 
         else:       #if we don't want to do classifier free guidance, but we cannot decide here how much attention to pay to the prompt
             cond_tokens = tokenizer.batch_encode_plus([prompt], padding="max_length", max_length=77 ).input_ids
             tokens = torch.tensor(cond_tokens, dtype=torch.long, device=device)
             context = clip(tokens)      #(batch_size , seq_len/context length) -> (batch_size , seq_len/context length , dim/channels/embedding )
-
+            # print(f"context_max: {context.max().item():.3f}, context_min: {context.min().item():.3f}")
         to_idle(clip)  # for moving the model to the cpu after using them 
 
         if sampler_name == "ddpm":
             sampler = DDPMSampler(generate)
-            sampler.set_inferrence_steps(n_inference_steps)
+            sampler.set_inference_timesteps(n_inference_steps)  
         else:
             raise ValueError(f"sampler {sampler_name} not recognized")
 
@@ -91,11 +95,12 @@ def generate(
             encoder = model["encoder"]
             encoder.to(device)
 
-            # few preprocessing steps for input image(would be better if we could make a separate function for this)
+           # few preprocessing steps for input image(would be better if we could make a separate function for this)
             input_image_tensor = input_image.resize((Height, Width))    #shape is ( , height , width, channl)
             input_image_tensor = np.array(input_image_tensor)   # array ( height , width , channel )
+            input_image_tensor = torch.tensor(input_image_tensor, dtype=torch.float32, device=device)  #(height , width , channel )
+
             input_image_tensor = rescale(input_image_tensor, (0, 255), (-1, 1)) #rescaling 
-            input_image_tensor = torch.tensor(input_image_tensor, dtype=torch.float32)  #(height , width , channel )
             input_image_tensor = input_image_tensor.unsqueeze(0)    # adding the batch dimension (1, height , width , channel )
             input_image_tensor = input_image_tensor.permute(0, 3, 1, 2) #changing order to tensor (1, channel , height , width)
 
@@ -112,6 +117,8 @@ def generate(
         else:   # if we dont have a input image then a random generator will randomly generate the latent shape noise, it need not to be passed through the encoder
             latents = torch.randn(latents_shape, generator=generate, device=device)
 
+        # print(f"Initial latents: min={latents.min():.3f}, max={latents.max():.3f}")
+
         diffusion = model["diffusion"]
         diffusion.to(device)
 
@@ -125,24 +132,31 @@ def generate(
                 model_input = model_input.repeat(2, 1, 1, 1)
 
             model_output = diffusion(model_input, context, time_embedding)      #time_embedding is flexible it works according to batch_size
-
+            # print(model_output.min(), model_output.max())
             # why do we predict noise instead of the denoised image itself
 
             if do_cfg:
                 output_cond, output_uncond = model_output.chunk(2)      #double the batch size of the usual ones    #first output is context second is without context
                 model_output = cfg_scale * (output_cond - output_uncond) + output_uncond
-
+            
+            # print(f"{model_output.min():.3f}, {model_output.max():.3f}")
             latents = sampler.step(timestep, latents, model_output)     #need to understand this function 
 
-            to_idle(diffusion)
+        to_idle(diffusion)
 
-            decoder = model["decoder"]
-            decoder.to(device)
+        decoder = model["decoder"]
+        decoder.to(device)
 
-            images = decoder(latents)
-            images = rescale(images, (-1, 1), (0, 255), clamp=True)
-            images = images.permute(0, 2, 3, 1)
-            images = images.to("cpu", torch.uint8).numpy()
+        # print(f"Latents before decoder: min={latents.min():.3f}, max={latents.max():.3f}")
+
+        images = decoder(latents)
+        to_idle(decoder)
+
+        images = rescale(images, (-1, 1), (0, 255), clamp=True)
+        images = images.permute(0, 2, 3, 1)
+        images = images.to("cpu", torch.uint8).numpy()
+
+        return images[0]   #returning the first image in the batch
 
 def rescale(x, old_range, new_range, clamp=False):
     old_min, old_max = old_range
@@ -163,3 +177,50 @@ def get_time_embedding(timestep):       #need to understand this function
     x = torch.tensor([timestep], dtype=torch.float32)[:, None] * freqs[None]
     #(1,160*2)
     return torch.cat([torch.cos(x), torch.sin(x)], dim=-1)
+
+
+
+# if __name__ == "__main__":
+
+
+#     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    
+#     print(f"Using device: {DEVICE}")
+#     tokenizer = CLIPTokenizer("../dataa/vocab.json", merges_file="../dataa/merges.txt")
+#     model_file = "../dataa/v1-5-pruned-emaonly.ckpt"
+
+#     models = model_loader.preload_models_from_standard_weights(model_file, DEVICE)
+
+#     # text to image
+#     prompt = "make cat eyes blue"
+#     uncond_prompt = ""
+#     do_cfg = True
+#     cfg_scale=7.5
+
+#     #image to image
+#     # input_image = None
+#     image_path = "../image/A-Cat.jpg"
+#     input_image = Image.open(image_path)
+
+#     strength = 0.7  # between 0 and 1
+
+#     sampler = "ddpm"
+#     num_inference_steps = 50
+#     seed = 42
+
+#     output_image = generate(
+#         prompt = prompt,
+#         uncon_prompt = uncond_prompt,
+#         input_image = input_image,
+#         strength = strength,
+#         do_cfg = do_cfg,
+#         cfg_scale = cfg_scale,
+#         sampler_name= sampler,
+#         n_inference_steps = num_inference_steps,
+#         seed = seed,
+#         device = DEVICE,
+#         idle_device=DEVICE,
+#         model = models,
+#         tokenizer = tokenizer,
+
+#     )
