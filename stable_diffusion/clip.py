@@ -73,7 +73,7 @@ class Clip(nn.Module):
         self.layers = nn.ModuleList([
             ClipLayer(n_head=12, n_embd=768) for i in range(12)
         ])
-        self.layersnorms = nn.LayerNorm(768)
+        self.layernorm = nn.LayerNorm(768)
 
     def forward(self , tokens : torch.LongTensor) -> torch.FloatTensor:
 
@@ -83,6 +83,6 @@ class Clip(nn.Module):
         # passing through the layers multiple times
         for layer in self.layers:
             state = layer(state)
-        output = self.layersnorms(state)
+        output = self.layernorm(state)
 
         return output

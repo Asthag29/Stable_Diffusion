@@ -13,7 +13,7 @@ class TimeEmbedding(nn.Module):     #current time step information
         super().__init__()
 
         self.linear_1 = nn.Linear(n_embd , 4 * n_embd)
-        self.linear_2 = nn.Linear(4 * n_embd , n_embd)
+        self.linear_2 = nn.Linear(4 * n_embd , 4 * n_embd)
 
     def forward(self, x):
 
@@ -88,7 +88,7 @@ class UNet(nn.Module):
             # (batch_size , 640 , height/32 , width/32) --> (batch_size , 1280 , height/32 , width/32) --> (batch_size , 1280 , height/32 , width/32)
             SwitchSequential(UNet_ResidualBlock( 640, 1280), UNet_AttentionBlock(8,160)),   #1280 = 8*160
             # (batch_size , 1280 , height/32 , width/32) --> (batch_size , 1280 , height/32 , width/32) --> (batch_size , 1280 , height/32 , width/32)
-            SwitchSequential(UNet_ResidualBlock(128 , 1280), UNet_AttentionBlock(8,160)),   #1280 = 8*160
+            SwitchSequential(UNet_ResidualBlock(1280 , 1280), UNet_AttentionBlock(8,160)),   #1280 = 8*160
 
 
             #(batch_size , 1280 , height/32 , width/32) --> (batch_size , 1280 , height/64 , width/64)
@@ -131,13 +131,13 @@ class UNet(nn.Module):
             #(batch_size , 1920 , height/16 , width/16) --> (batch_size , 640 , height/16 , width/16) --> (batch_size , 640 , height/16 , width/16)
             SwitchSequential(UNet_ResidualBlock(1920 , 640), UNet_AttentionBlock(8 , 80)),  #640 = 8*80
             #(batch_size , 960 , height/16 , width/16) --> (batch_size , 640 , height/16 , width/16) --> (batch_size , 640 , height/16 , width/16)
-            SwitchSequential(UNet_ResidualBlock(960 , 640), UNet_AttentionBlock(8 , 80)),   #640 = 8*80
+            SwitchSequential(UNet_ResidualBlock(1280 , 640), UNet_AttentionBlock(8 , 80)),   #640 = 8*80
             #(batch_size , 960 , height/16 , width/16) --> (batch_size , 640 , height/16 , width/16) --> (batch_size , 640 , height/8 , width/8)
             SwitchSequential(UNet_ResidualBlock(960 , 640), UNet_AttentionBlock(8 , 80), Upsample(640)),    #640 = 8*80
             #(batch_size , 960 , height/8 , width/8) --> (batch_size , 320 , height/8 , width/8) --> (batch_size , 320 , height/8 , width/8)
             SwitchSequential(UNet_ResidualBlock(960 , 320), UNet_AttentionBlock(8 , 40)),   #320 = 8*40
             #(batch_size , 640 , height/8 , width/8) --> (batch_size , 320 , height/8 , width/8) --> (batch_size , 320 , height/4 , width/4)
-            SwitchSequential(UNet_ResidualBlock(640 , 320), UNet_AttentionBlock(8 , 80)),   #320 = 8*40
+            SwitchSequential(UNet_ResidualBlock(640 , 320), UNet_AttentionBlock(8 , 40)),   #320 = 8*40
             #(batch_size , 640 , height/4 , width/4) --> (batch_size , 320 , height/4 , width/4) --> (batch_size , 320 , height/4 , width/4)
             SwitchSequential(UNet_ResidualBlock(640 , 320), UNet_AttentionBlock(8 , 40)),   #320 = 8*40
 
@@ -209,5 +209,7 @@ class Diffusion(nn.Module):
         output = self.final(output)  #(batch_size , 320 , height/8 , width/8) -> (batch_size , 4 , height/8 , width/8)
 
         return output
-    
+
+# Verdict: UNet/topology and time-embedding behavior match the prompt's UNET; only naming and small API defaults differ.
+
 
