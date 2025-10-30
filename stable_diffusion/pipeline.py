@@ -7,7 +7,6 @@ from PIL import Image
 from transformers import CLIPTokenizer
 import torch
 
-
 Width = 512     #final image width(input)
 Height = 512    #final image height(inpout)
 Latent_Width = Width // 8       #latent image width(vae encoder output)
@@ -18,6 +17,7 @@ Latent_Height = Height // 8        #latent image height(vae encoder output)
 # cfg_scale = 7.5 (difference between conditioned and unconditioned)
 # uncon_prompt = without any condition
 # each time step indicates the noise level              #python linting
+#higher strength means higher inference steps which means less attention to starting image
 
 def generate(
     prompt: str,    #what we want to generate
@@ -32,7 +32,8 @@ def generate(
     device=None,
     idle_device=None,
     tokenizer=None,
-    cfg_scale=7.5       #how much value we want our model to give to prompt(w) in the baove image
+    cfg_scale=7.5,      #how much value we want our model to give to prompt(w) in the baove image
+    video: bool = False,
 ):
     
     with torch.no_grad():
@@ -124,6 +125,8 @@ def generate(
 
         timesteps = tqdm(sampler.timesteps)     #how many timesteps we want to do
 
+       
+        latents_list = []  # for video generation
         for i, timestep in enumerate(timesteps):
             time_embedding = get_time_embedding(timestep).to(device)
             model_input = latents
@@ -132,31 +135,43 @@ def generate(
                 model_input = model_input.repeat(2, 1, 1, 1)
 
             model_output = diffusion(model_input, context, time_embedding)      #time_embedding is flexible it works according to batch_size
-            # print(model_output.min(), model_output.max())
             # why do we predict noise instead of the denoised image itself
 
             if do_cfg:
                 output_cond, output_uncond = model_output.chunk(2)      #double the batch size of the usual ones    #first output is context second is without context
                 model_output = cfg_scale * (output_cond - output_uncond) + output_uncond
             
-            # print(f"{model_output.min():.3f}, {model_output.max():.3f}")
-            latents = sampler.step(timestep, latents, model_output)     #need to understand this function 
+            latents = sampler.step(timestep, latents, model_output)     #need to understand this function
+            if video:
+                latents_list.append(latents.cpu().clone())
+        
 
         to_idle(diffusion)
 
         decoder = model["decoder"]
         decoder.to(device)
 
-        # print(f"Latents before decoder: min={latents.min():.3f}, max={latents.max():.3f}")
+        if video:
+            images = []
+            for latents in latents_list:
+                latents = latents.to(device)
+                image = decoder(latents)
+                image = rescale(image, (-1, 1), (0, 255), clamp=True)
+                image = image.permute(0, 2, 3, 1)
+                image = image.to("cpu", torch.uint8).numpy()
+                images.append(image[0])   #appending the first image in the batch
+            to_idle(decoder)
+            return images   #returning all the images for video generation
 
-        images = decoder(latents)
-        to_idle(decoder)
+        else:
+            images = decoder(latents)
+            to_idle(decoder)
 
-        images = rescale(images, (-1, 1), (0, 255), clamp=True)
-        images = images.permute(0, 2, 3, 1)
-        images = images.to("cpu", torch.uint8).numpy()
+            images = rescale(images, (-1, 1), (0, 255), clamp=True)
+            images = images.permute(0, 2, 3, 1)
+            images = images.to("cpu", torch.uint8).numpy()
 
-        return images[0]   #returning the first image in the batch
+            return images[0]   #returning the first image in the batch
 
 def rescale(x, old_range, new_range, clamp=False):
     old_min, old_max = old_range
@@ -180,47 +195,3 @@ def get_time_embedding(timestep):       #need to understand this function
 
 
 
-# if __name__ == "__main__":
-
-
-#     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-    
-#     print(f"Using device: {DEVICE}")
-#     tokenizer = CLIPTokenizer("../dataa/vocab.json", merges_file="../dataa/merges.txt")
-#     model_file = "../dataa/v1-5-pruned-emaonly.ckpt"
-
-#     models = model_loader.preload_models_from_standard_weights(model_file, DEVICE)
-
-#     # text to image
-#     prompt = "make cat eyes blue"
-#     uncond_prompt = ""
-#     do_cfg = True
-#     cfg_scale=7.5
-
-#     #image to image
-#     # input_image = None
-#     image_path = "../image/A-Cat.jpg"
-#     input_image = Image.open(image_path)
-
-#     strength = 0.7  # between 0 and 1
-
-#     sampler = "ddpm"
-#     num_inference_steps = 50
-#     seed = 42
-
-#     output_image = generate(
-#         prompt = prompt,
-#         uncon_prompt = uncond_prompt,
-#         input_image = input_image,
-#         strength = strength,
-#         do_cfg = do_cfg,
-#         cfg_scale = cfg_scale,
-#         sampler_name= sampler,
-#         n_inference_steps = num_inference_steps,
-#         seed = seed,
-#         device = DEVICE,
-#         idle_device=DEVICE,
-#         model = models,
-#         tokenizer = tokenizer,
-
-#     )
