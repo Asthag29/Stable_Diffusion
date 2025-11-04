@@ -1,4 +1,4 @@
-from attention import SelfAttention
+from ..attention import SelfAttention
 import torch
 from torch import nn
 from torch.nn import functional as F

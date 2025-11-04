@@ -1,6 +1,6 @@
 from torch import nn
-from vae_block import Vae_AttentionBlock
-from vae_block import Vae_ResidualBlock
+from .vae_block import Vae_AttentionBlock
+from .vae_block import Vae_ResidualBlock
     
 
 class VAE_Decoder(nn.Sequential):

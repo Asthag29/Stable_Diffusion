@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from diffusion_block import UNet_ResidualBlock , UNet_AttentionBlock
+from .diffusion_block import UNet_ResidualBlock , UNet_AttentionBlock
 
 
 

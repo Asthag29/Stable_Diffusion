@@ -1,6 +1,6 @@
 from torch import nn
 from torch.nn import functional as F
-from attention import SelfAttention , CrossAttention
+from ..attention import SelfAttention , CrossAttention
 
 #Attention Block
 class UNet_AttentionBlock(nn.Module):

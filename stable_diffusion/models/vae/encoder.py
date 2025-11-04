@@ -1,8 +1,8 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from vae_block import Vae_ResidualBlock
-from vae_block import Vae_AttentionBlock
+from .vae_block import Vae_ResidualBlock
+from .vae_block import Vae_AttentionBlock
 
 
 class VAE_Encoder(nn.Sequential):

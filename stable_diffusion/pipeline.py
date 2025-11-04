@@ -1,13 +1,14 @@
 import torch
 import numpy as np
 from tqdm import tqdm
-from ddpm import DDPMSampler
+from .ddpm import DDPMSampler
 # import model_loader
 from PIL import Image
 from transformers import CLIPTokenizer
 import torch
 
-from .utils import model_loader
+from .utils.model_loader import preload_models_from_standard_weights
+from .models.attention import SelfAttention
 
 Width = 512     #final image width(input)
 Height = 512    #final image height(inpout)

@@ -1,12 +1,12 @@
-from clip import Clip
-from encoder import VAE_Encoder
-from decoder import VAE_Decoder
-from diffusion_unet import Diffusion
-import model_converter
+from stable_diffusion.models.clip import Clip
+from stable_diffusion.models.vae.encoder import VAE_Encoder
+from stable_diffusion.models.vae.decoder import VAE_Decoder
+from stable_diffusion.models.diffusion.diffusion_unet import Diffusion
+from .model_converter import load_from_standard_weights
 import torch
 
 def preload_models_from_standard_weights(ckpt_path, device):
-    state_dict = model_converter.load_from_standard_weights(ckpt_path, device)
+    state_dict = load_from_standard_weights(ckpt_path, device)
 
     encoder = VAE_Encoder().to(device)
     encoder.load_state_dict(state_dict["encoder"], strict=True)
