@@ -1,4 +1,4 @@
-##  Stable Diffusion{for learning the architecture}
+##  Stable Diffusion{for architecture implementation}
 This project is a learning-focused implementation of the Stable Diffusion model, inspired by Umar Jamil’s YouTube on building diffusion models from scratch. I felt that some of the explanations in his videos were a bit vague, so I’ve expanded on them with detailed comments and illustrations throughout the code.
 <br> 
 
