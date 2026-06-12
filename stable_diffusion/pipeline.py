@@ -142,7 +142,7 @@ def generate(
 
             if do_cfg:
                 output_cond, output_uncond = model_output.chunk(2)      #double the batch size of the usual ones    #first output is context second is without context
-                model_output = cfg_scale * (output_cond - output_uncond) + output_uncond
+                model_output = cfg_scale * (output_cond - output_uncond) + output_uncond #!important
             
             latents = sampler.step(timestep, latents, model_output)     #need to understand this function
             if video:
