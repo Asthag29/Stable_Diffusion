@@ -4,7 +4,9 @@ This repository is an implementation of Stable Diffusion based on Umar Jamil's Y
 
 I have added detailed explanations throughout the code, especially around how tensors are projected and how their shapes change at each layer of the model.
 
-![Denoising process demo](notebooks/out.gif)
+<p align="center">
+  <img src="notebooks/out.gif" alt="Denoising process demo" width="512">
+</p>
 
 ## Setup
 
